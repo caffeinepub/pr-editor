@@ -434,6 +434,11 @@ export default function App() {
   const [rightTab, setRightTab] = useState<RightTab>("props");
   const [audioSub, setAudioSub] = useState<AudioSubTab>("music");
   const [captionLang, setCaptionLang] = useState<CaptionLang>("en");
+  const [showGallery, setShowGallery] = useState(false);
+  const [galleryTab, setGalleryTab] = useState<"videos" | "images" | "audio">(
+    "videos",
+  );
+  const [selectedMedia, setSelectedMedia] = useState<string[]>([]);
 
   // playback
   const [isPlaying, setIsPlaying] = useState(false);
@@ -748,47 +753,93 @@ export default function App() {
                 className={`tab-section${leftTab === "media" ? " visible" : ""}`}
               >
                 <div className="section-label">Media Library</div>
-                <button
-                  type="button"
-                  className="upload-box"
-                  onClick={() => toast.info("Select files to upload")}
-                  data-ocid="media.dropzone"
-                >
-                  <div style={{ fontSize: 24, marginBottom: 8 }}>📁</div>
-                  <div style={{ fontSize: 11, color: "#666", marginBottom: 8 }}>
-                    Drop files here
-                  </div>
+                {/* Upload + Gallery buttons */}
+                <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
                   <button
                     type="button"
-                    className="tool-btn red"
-                    style={{ justifyContent: "center" }}
+                    className="tool-btn"
+                    style={{ flex: 1, justifyContent: "center", fontSize: 11 }}
+                    onClick={() => {
+                      const inp = document.createElement("input");
+                      inp.type = "file";
+                      inp.accept =
+                        "video/*,image/*,audio/*,.mp4,.mov,.avi,.png,.jpg,.jpeg,.mp3,.wav";
+                      inp.multiple = true;
+                      inp.onchange = () => {
+                        const files = Array.from(inp.files || []);
+                        if (files.length) {
+                          setSelectedMedia((prev) => [
+                            ...prev,
+                            ...files.map((f) => f.name),
+                          ]);
+                          toast.success(`${files.length} file(s) added`);
+                        }
+                      };
+                      inp.click();
+                    }}
                     data-ocid="media.upload_button"
                   >
-                    + Upload Media
+                    📤 Upload
                   </button>
-                </button>
-                <div className="section-label" style={{ marginTop: 12 }}>
+                  <button
+                    type="button"
+                    className="tool-btn cyan"
+                    style={{ flex: 1, justifyContent: "center", fontSize: 11 }}
+                    onClick={() => setShowGallery(true)}
+                    data-ocid="media.gallery_button"
+                  >
+                    🖼 Gallery
+                  </button>
+                </div>
+                <div className="section-label" style={{ marginTop: 4 }}>
                   Project Files
                 </div>
-                {[
-                  "Intro.mp4",
-                  "Main_scene.mp4",
-                  "Background.mp3",
-                  "Logo.png",
-                ].map((f, i) => (
+                {(selectedMedia.length > 0
+                  ? selectedMedia
+                  : [
+                      "Intro.mp4",
+                      "Main_scene.mp4",
+                      "Background.mp3",
+                      "Logo.png",
+                    ]
+                ).map((f, i) => (
                   <div
                     key={f}
                     className="audio-item"
                     data-ocid={`media.item.${i + 1}`}
                   >
                     <span>
-                      {f.endsWith(".mp3")
+                      {f.endsWith(".mp3") || f.endsWith(".wav")
                         ? "🎵"
-                        : f.endsWith(".png")
+                        : f.endsWith(".png") ||
+                            f.endsWith(".jpg") ||
+                            f.endsWith(".jpeg")
                           ? "🖼️"
                           : "🎬"}
                     </span>
-                    <span style={{ fontSize: 11, color: "#aaa" }}>{f}</span>
+                    <span style={{ fontSize: 11, color: "#aaa", flex: 1 }}>
+                      {f}
+                    </span>
+                    {selectedMedia.length > 0 && (
+                      <button
+                        type="button"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#ff4444",
+                          cursor: "pointer",
+                          fontSize: 12,
+                          padding: "0 2px",
+                        }}
+                        onClick={() =>
+                          setSelectedMedia((prev) =>
+                            prev.filter((_, idx) => idx !== i),
+                          )
+                        }
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1934,6 +1985,256 @@ export default function App() {
         </div>
       </div>
       <Toaster />
+
+      {/* ─── Gallery Modal ─── */}
+      {showGallery && (
+        <dialog
+          aria-modal="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.85)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowGallery(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setShowGallery(false);
+          }}
+        >
+          <div
+            style={{
+              background: "#1a1a2e",
+              border: "1px solid #00e5ff44",
+              borderRadius: 12,
+              width: "min(760px, 95vw)",
+              maxHeight: "80vh",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              boxShadow: "0 0 40px rgba(0,229,255,0.15)",
+            }}
+          >
+            {/* Modal header */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "14px 18px",
+                borderBottom: "1px solid #ffffff11",
+              }}
+            >
+              <span style={{ fontWeight: 700, fontSize: 15, color: "#00e5ff" }}>
+                🖼 Media Gallery
+              </span>
+              <button
+                type="button"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#aaa",
+                  fontSize: 20,
+                  cursor: "pointer",
+                }}
+                onClick={() => setShowGallery(false)}
+              >
+                ✕
+              </button>
+            </div>
+            {/* Tabs */}
+            <div
+              style={{
+                display: "flex",
+                gap: 6,
+                padding: "10px 18px",
+                borderBottom: "1px solid #ffffff11",
+              }}
+            >
+              {(["videos", "images", "audio"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setGalleryTab(tab)}
+                  style={{
+                    padding: "5px 14px",
+                    borderRadius: 6,
+                    fontSize: 12,
+                    cursor: "pointer",
+                    background: galleryTab === tab ? "#00e5ff" : "#ffffff11",
+                    color: galleryTab === tab ? "#000" : "#ccc",
+                    border: "none",
+                    fontWeight: galleryTab === tab ? 700 : 400,
+                    textTransform: "capitalize",
+                  }}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+            {/* Grid */}
+            <div style={{ padding: 16, overflowY: "auto", flex: 1 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill,minmax(130px,1fr))",
+                  gap: 12,
+                }}
+              >
+                {galleryTab === "videos" &&
+                  [
+                    { name: "Intro Clip", dur: "0:12", thumb: "🎬" },
+                    { name: "Main Scene", dur: "1:05", thumb: "🎬" },
+                    { name: "Outro", dur: "0:08", thumb: "🎬" },
+                    { name: "B-Roll 1", dur: "0:23", thumb: "🎬" },
+                    { name: "B-Roll 2", dur: "0:18", thumb: "🎬" },
+                    { name: "Title Card", dur: "0:05", thumb: "🎬" },
+                  ].map((item) => (
+                    <button
+                      type="button"
+                      key={item.name}
+                      onClick={() => {
+                        setSelectedMedia((prev) => [
+                          ...prev,
+                          `${item.name}.mp4`,
+                        ]);
+                        toast.success(`${item.name} added`);
+                        setShowGallery(false);
+                      }}
+                      style={{
+                        background: "#0d0d1a",
+                        border: "1px solid #ffffff15",
+                        borderRadius: 8,
+                        padding: 10,
+                        cursor: "pointer",
+                        textAlign: "center",
+                        transition: "border-color 0.15s",
+                        width: "100%",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = "#00e5ff";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = "#ffffff15";
+                      }}
+                    >
+                      <div style={{ fontSize: 36, marginBottom: 6 }}>
+                        {item.thumb}
+                      </div>
+                      <div
+                        style={{ fontSize: 11, color: "#ccc", marginBottom: 2 }}
+                      >
+                        {item.name}
+                      </div>
+                      <div style={{ fontSize: 10, color: "#666" }}>
+                        {item.dur}
+                      </div>
+                    </button>
+                  ))}
+                {galleryTab === "images" &&
+                  [
+                    { name: "Background", thumb: "🖼️" },
+                    { name: "Logo", thumb: "🖼️" },
+                    { name: "Overlay 1", thumb: "🖼️" },
+                    { name: "Overlay 2", thumb: "🖼️" },
+                    { name: "Thumbnail", thumb: "🖼️" },
+                    { name: "Banner", thumb: "🖼️" },
+                  ].map((item) => (
+                    <button
+                      type="button"
+                      key={item.name}
+                      onClick={() => {
+                        setSelectedMedia((prev) => [
+                          ...prev,
+                          `${item.name}.png`,
+                        ]);
+                        toast.success(`${item.name} added`);
+                        setShowGallery(false);
+                      }}
+                      style={{
+                        background: "#0d0d1a",
+                        border: "1px solid #ffffff15",
+                        borderRadius: 8,
+                        padding: 10,
+                        cursor: "pointer",
+                        textAlign: "center",
+                        transition: "border-color 0.15s",
+                        width: "100%",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = "#00e5ff";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = "#ffffff15";
+                      }}
+                    >
+                      <div style={{ fontSize: 36, marginBottom: 6 }}>
+                        {item.thumb}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#ccc" }}>
+                        {item.name}
+                      </div>
+                    </button>
+                  ))}
+                {galleryTab === "audio" &&
+                  [
+                    { name: "BG Music", dur: "2:30", thumb: "🎵" },
+                    { name: "SFX Hit", dur: "0:02", thumb: "🔊" },
+                    { name: "Ambient", dur: "3:00", thumb: "🎵" },
+                    { name: "Voiceover", dur: "0:45", thumb: "🎤" },
+                    { name: "Jingle", dur: "0:15", thumb: "🎵" },
+                    { name: "Transition", dur: "0:03", thumb: "🔊" },
+                  ].map((item) => (
+                    <button
+                      type="button"
+                      key={item.name}
+                      onClick={() => {
+                        setSelectedMedia((prev) => [
+                          ...prev,
+                          `${item.name}.mp3`,
+                        ]);
+                        toast.success(`${item.name} added`);
+                        setShowGallery(false);
+                      }}
+                      style={{
+                        background: "#0d0d1a",
+                        border: "1px solid #ffffff15",
+                        borderRadius: 8,
+                        padding: 10,
+                        cursor: "pointer",
+                        textAlign: "center",
+                        transition: "border-color 0.15s",
+                        width: "100%",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = "#00e5ff";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = "#ffffff15";
+                      }}
+                    >
+                      <div style={{ fontSize: 36, marginBottom: 6 }}>
+                        {item.thumb}
+                      </div>
+                      <div
+                        style={{ fontSize: 11, color: "#ccc", marginBottom: 2 }}
+                      >
+                        {item.name}
+                      </div>
+                      <div style={{ fontSize: 10, color: "#666" }}>
+                        {item.dur}
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </div>
+        </dialog>
+      )}
     </>
   );
 }

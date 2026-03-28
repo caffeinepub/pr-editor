@@ -474,6 +474,14 @@
 .tool-btn.red:hover {
   background: hsl(197 100% 38%);
 }
+.tool-btn.cyan {
+  background: #00e5ff22;
+  border-color: #00e5ff;
+  color: #00e5ff;
+}
+.tool-btn.cyan:hover {
+  background: #00e5ff44;
+}
 
 .grid-2 {
   display: grid;
