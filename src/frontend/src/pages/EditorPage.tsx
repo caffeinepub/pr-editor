@@ -1,18 +1,14 @@
-import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
-import { cn } from "@/lib/utils";
 import {
+  FastForward,
+  Maximize,
   Pause,
   Play,
-  Plus,
-  Scissors,
-  SkipBack,
-  SkipForward,
+  Rewind,
+  Square,
   Volume2,
-  ZoomIn,
-  ZoomOut,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import type { Project } from "../backend";
 import LeftPanel from "../components/editor/LeftPanel";
 import RightPanel from "../components/editor/RightPanel";
@@ -23,384 +19,424 @@ interface Props {
   onBack: () => void;
 }
 
-const TOTAL_DURATION = 90; // seconds
+type LeftTab =
+  | "media"
+  | "audio"
+  | "effects"
+  | "filters"
+  | "stickers"
+  | "text"
+  | "transitions"
+  | "captions"
+  | "ai"
+  | "templates"
+  | "voiceover";
 
-const MOCK_CLIPS = [
-  {
-    id: "v1",
-    track: "video",
-    start: 0,
-    end: 60,
-    label: "Main Video.mp4",
-    color: "bg-violet-600",
-  },
-  {
-    id: "v2",
-    track: "video",
-    start: 65,
-    end: 90,
-    label: "B-Roll.mp4",
-    color: "bg-violet-500",
-  },
-  {
-    id: "a1",
-    track: "audio1",
-    start: 0,
-    end: 45,
-    label: "Epic Background",
-    color: "bg-cyan-600",
-  },
-  {
-    id: "a2",
-    track: "audio1",
-    start: 50,
-    end: 80,
-    label: "Happy Vibes",
-    color: "bg-cyan-500",
-  },
-  {
-    id: "a3",
-    track: "audio2",
-    start: 10,
-    end: 25,
-    label: "Meme Boom",
-    color: "bg-teal-500",
-  },
-  {
-    id: "t1",
-    track: "text",
-    start: 5,
-    end: 20,
-    label: "Intro Title",
-    color: "bg-amber-500",
-  },
-  {
-    id: "t2",
-    track: "text",
-    start: 40,
-    end: 60,
-    label: "Telugu Caption",
-    color: "bg-orange-500",
-  },
-];
+const TOTAL_DURATION = 60;
 
-const TRACKS = [
-  { id: "video", label: "Video 1", color: "bg-violet-600" },
-  { id: "audio1", label: "Audio 1", color: "bg-cyan-600" },
-  { id: "audio2", label: "Audio 2", color: "bg-teal-500" },
-  { id: "text", label: "Text", color: "bg-amber-500" },
-];
-
-function formatTime(sec: number) {
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-const RULER_MARKS = Array.from({ length: 10 }, (_, i) => ({
-  label: formatTime((TOTAL_DURATION / 10) * i),
-}));
+const TIMELINE_CLIPS = {
+  video: [
+    { start: 0, end: 15, label: "Clip 1", color: "#0ea5e9" },
+    { start: 18, end: 35, label: "Clip 2", color: "#38bdf8" },
+    { start: 38, end: 60, label: "Clip 3", color: "#0ea5e9" },
+  ],
+  audio: [{ start: 0, end: 60, label: "Music Track", color: "#10b981" }],
+  effects: [
+    { start: 5, end: 12, label: "Fade In", color: "#f59e0b" },
+    { start: 30, end: 38, label: "Zoom", color: "#f59e0b" },
+  ],
+};
 
 export default function EditorPage({ project, onBack }: Props) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [volume, setVolume] = useState(80);
-  const [zoom, setZoom] = useState(1);
-  const [selectedClip, setSelectedClip] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(100);
+  const [leftTab, setLeftTab] = useState<LeftTab>("media");
   const rafRef = useRef<number | null>(null);
-  const lastTimestampRef = useRef<number | null>(null);
+  const lastTimeRef = useRef<number>(0);
 
-  useEffect(() => {
-    if (isPlaying) {
-      const tick = (timestamp: number) => {
-        if (lastTimestampRef.current !== null) {
-          const delta = (timestamp - lastTimestampRef.current) / 1000;
-          setCurrentTime((prev) => {
-            if (prev >= TOTAL_DURATION) {
-              setIsPlaying(false);
-              return 0;
-            }
-            return prev + delta;
-          });
-        }
-        lastTimestampRef.current = timestamp;
-        rafRef.current = requestAnimationFrame(tick);
-      };
-      lastTimestampRef.current = null;
-      rafRef.current = requestAnimationFrame(tick);
-    } else {
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      lastTimestampRef.current = null;
+  const stopPlayback = useCallback(() => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     }
-    return () => {
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-    };
-  }, [isPlaying]);
+    setIsPlaying(false);
+  }, []);
 
-  const playheadPercent = (currentTime / TOTAL_DURATION) * 100;
+  const tick = useCallback(
+    (now: number) => {
+      const delta = (now - lastTimeRef.current) / 1000;
+      lastTimeRef.current = now;
+      setCurrentTime((t) => {
+        const next = t + delta;
+        if (next >= TOTAL_DURATION) {
+          stopPlayback();
+          return 0;
+        }
+        return next;
+      });
+      rafRef.current = requestAnimationFrame(tick);
+    },
+    [stopPlayback],
+  );
+
+  const handlePlay = useCallback(() => {
+    if (isPlaying) {
+      stopPlayback();
+    } else {
+      setIsPlaying(true);
+      lastTimeRef.current = performance.now();
+      rafRef.current = requestAnimationFrame(tick);
+    }
+  }, [isPlaying, stopPlayback, tick]);
+
+  const handleStop = useCallback(() => {
+    stopPlayback();
+    setCurrentTime(0);
+  }, [stopPlayback]);
+
+  useEffect(
+    () => () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    },
+    [],
+  );
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    const fr = Math.floor((s % 1) * 30);
+    return `${m}:${String(sec).padStart(2, "0")}:${String(fr).padStart(2, "0")}`;
+  };
+
+  const timelineProgress = (currentTime / TOTAL_DURATION) * 100;
+  const frame = Math.floor((currentTime % 1) * 30);
 
   return (
-    <div className="flex flex-col h-screen bg-background overflow-hidden">
-      <TopToolbar project={project} onBack={onBack} />
+    <div className="editor-root" data-ocid="editor.page">
+      <TopToolbar
+        project={project}
+        onBack={onBack}
+        zoom={zoom}
+        onZoomIn={() => setZoom((z) => Math.min(z + 25, 300))}
+        onZoomOut={() => setZoom((z) => Math.max(z - 25, 25))}
+        onSave={() => toast.success("Project saved")}
+      />
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Panel */}
-        <aside className="w-[272px] flex-shrink-0 border-r border-border overflow-hidden">
-          <LeftPanel />
-        </aside>
+      <div className="editor-body">
+        <LeftPanel activeTab={leftTab} onTabChange={setLeftTab} />
 
-        {/* Center */}
-        <main className="flex-1 flex flex-col overflow-hidden">
-          {/* Preview Canvas */}
-          <div
-            className="flex-1 bg-black flex items-center justify-center relative overflow-hidden"
-            data-ocid="editor.canvas_target"
-          >
-            {/* Film grain overlay */}
-            <div className="absolute inset-0 opacity-[0.02] pointer-events-none bg-[url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E')]" />
-            {/* 16:9 canvas */}
-            <div
-              className="relative w-full max-w-4xl"
-              style={{ aspectRatio: "16/9" }}
-            >
-              <div className="w-full h-full bg-gradient-to-br from-zinc-900 via-zinc-950 to-black flex items-center justify-center border border-zinc-800 relative overflow-hidden">
-                {/* Mock video content */}
-                <div className="absolute inset-0 bg-gradient-to-br from-violet-950/30 via-transparent to-cyan-950/20" />
-                <div className="text-center z-10">
-                  <div className="font-display text-3xl font-bold text-white/20 mb-2">
-                    {project.name}
-                  </div>
-                  <div className="text-white/30 text-sm">
-                    {formatTime(currentTime)} / {formatTime(TOTAL_DURATION)}
-                  </div>
+        <div className="center-area">
+          {/* Preview */}
+          <div className="preview-area">
+            <div className="preview-canvas">
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background:
+                    "repeating-linear-gradient(0deg, transparent, transparent 39px, hsl(240 5% 10%) 39px, hsl(240 5% 10%) 40px), repeating-linear-gradient(90deg, transparent, transparent 69px, hsl(240 5% 10%) 69px, hsl(240 5% 10%) 70px)",
+                  opacity: 0.4,
+                }}
+              />
+              <div className="flex flex-col items-center gap-3 relative z-10">
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 16,
+                    background: "hsl(197 100% 45% / 0.12)",
+                    border: "1px solid hsl(197 100% 45% / 0.25)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Play
+                    style={{
+                      width: 28,
+                      height: 28,
+                      color: "hsl(197 100% 45%)",
+                      opacity: 0.8,
+                      fill: "hsl(197 100% 45%)",
+                    }}
+                  />
                 </div>
-
-                {/* Play overlay */}
-                {!isPlaying && (
-                  <button
-                    type="button"
-                    className="absolute inset-0 flex items-center justify-center group"
-                    onClick={() => setIsPlaying(true)}
-                    data-ocid="editor.play.button"
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "hsl(240 5% 46%)",
+                    fontWeight: 500,
+                  }}
+                >
+                  {project.name}
+                </p>
+              </div>
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 8,
+                  right: 10,
+                  fontSize: 10,
+                  color: "hsl(240 5% 40%)",
+                  fontFamily: "JetBrains Mono, monospace",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                F{String(frame).padStart(2, "0")}
+              </div>
+              {isPlaying && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 8,
+                    left: 10,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: "hsl(197 100% 45%)",
+                      animation: "pulse 1s ease-in-out infinite",
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      color: "hsl(197 100% 55%)",
+                    }}
                   >
-                    <div className="w-16 h-16 rounded-full bg-white/10 border border-white/20 backdrop-blur flex items-center justify-center group-hover:bg-white/20 transition-all">
-                      <Play className="w-7 h-7 text-white fill-white ml-1" />
-                    </div>
-                  </button>
-                )}
-              </div>
-
-              {/* Timecode badge */}
-              <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur text-xs text-white/80 px-2 py-1 rounded font-mono">
-                {formatTime(currentTime)}
-              </div>
+                    LIVE
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Playback Controls */}
-          <div className="h-12 bg-card border-t border-border flex items-center gap-3 px-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-foreground hover:text-primary"
-              onClick={() => setCurrentTime(0)}
-              data-ocid="editor.rewind.button"
+          {/* Playback controls */}
+          <div className="play-controls" data-ocid="editor.playback.panel">
+            <button
+              type="button"
+              className="ctrl-btn"
+              onClick={() => setCurrentTime((t) => Math.max(0, t - 5))}
+              title="Back 5s"
             >
-              <SkipBack className="w-4 h-4" />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-foreground hover:text-primary"
-              onClick={() => setIsPlaying(!isPlaying)}
-              data-ocid="editor.play_pause.toggle"
+              <Rewind style={{ width: 13, height: 13 }} />
+            </button>
+            <button
+              type="button"
+              className="ctrl-btn"
+              onClick={handleStop}
+              title="Stop"
+              data-ocid="editor.stop.button"
+            >
+              <Square style={{ width: 13, height: 13 }} />
+            </button>
+            <button
+              type="button"
+              className="ctrl-btn play-btn"
+              onClick={handlePlay}
+              title={isPlaying ? "Pause" : "Play"}
+              data-ocid="editor.play.button"
             >
               {isPlaying ? (
-                <Pause className="w-4 h-4" />
+                <Pause style={{ width: 16, height: 16 }} />
               ) : (
-                <Play className="w-4 h-4" />
+                <Play style={{ width: 16, height: 16 }} />
               )}
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-foreground hover:text-primary"
+            </button>
+            <button
+              type="button"
+              className="ctrl-btn"
               onClick={() =>
-                setCurrentTime(Math.min(TOTAL_DURATION, currentTime + 5))
+                setCurrentTime((t) => Math.min(TOTAL_DURATION, t + 5))
               }
-              data-ocid="editor.forward.button"
+              title="Forward 5s"
             >
-              <SkipForward className="w-4 h-4" />
-            </Button>
+              <FastForward style={{ width: 13, height: 13 }} />
+            </button>
 
-            {/* Scrubber */}
-            <div className="flex-1 flex items-center gap-2">
-              <Slider
-                min={0}
-                max={TOTAL_DURATION}
-                step={0.1}
-                value={[currentTime]}
-                onValueChange={([v]) => setCurrentTime(v)}
-                className="flex-1"
-                data-ocid="editor.timeline.input"
-              />
-            </div>
-
-            <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">
-              {formatTime(currentTime)} / {formatTime(TOTAL_DURATION)}
-            </span>
-
-            {/* Volume */}
-            <Volume2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-            <Slider
+            {/* Seek bar */}
+            <input
+              type="range"
               min={0}
-              max={100}
-              value={[volume]}
-              onValueChange={([v]) => setVolume(v)}
-              className="w-20"
-              data-ocid="editor.volume.input"
+              max={TOTAL_DURATION}
+              step={0.1}
+              value={currentTime}
+              onChange={(e) => setCurrentTime(Number(e.target.value))}
+              className="flex-1 mx-1.5 h-1 accent-primary cursor-pointer"
+              style={{ margin: "0 6px" }}
+              aria-label="Seek"
             />
+
+            <span className="timecode">{formatTime(currentTime)}</span>
+
+            <button
+              type="button"
+              className="ctrl-btn"
+              onClick={() => toast.info("Volume")}
+              title="Volume"
+            >
+              <Volume2 style={{ width: 13, height: 13 }} />
+            </button>
+            <button
+              type="button"
+              className="ctrl-btn"
+              onClick={() => toast.info("Fullscreen")}
+              title="Fullscreen"
+              data-ocid="editor.fullscreen.button"
+            >
+              <Maximize style={{ width: 13, height: 13 }} />
+            </button>
           </div>
 
           {/* Timeline */}
-          <div className="h-[180px] bg-card border-t border-border flex flex-col">
-            {/* Timeline header */}
-            <div className="h-8 border-b border-border flex items-center">
-              <div className="w-[80px] flex-shrink-0 border-r border-border h-full flex items-center px-2 gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5"
-                  onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
-                  data-ocid="timeline.zoom_in.button"
-                >
-                  <ZoomIn className="w-3 h-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5"
-                  onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
-                  data-ocid="timeline.zoom_out.button"
-                >
-                  <ZoomOut className="w-3 h-3" />
-                </Button>
-              </div>
-              {/* Time ruler */}
-              <div className="flex-1 relative overflow-hidden h-full">
+          <div className="timeline-area" data-ocid="editor.timeline.panel">
+            <div className="timeline-ruler">
+              {Array.from({ length: 13 }, (_, i) => (
+                <div key={`ruler-${i * 5}`} className="ruler-tick">
+                  {i * 5}s
+                </div>
+              ))}
+            </div>
+            <div className="timeline-tracks">
+              {/* Video */}
+              <div className="timeline-track">
                 <div
-                  className="absolute inset-0 flex items-end pb-1"
-                  style={{ width: `${100 * zoom}%` }}
+                  className="track-label"
+                  style={{ borderLeft: "3px solid #0ea5e9" }}
                 >
-                  {RULER_MARKS.map((mark) => (
+                  VIDEO
+                </div>
+                <div
+                  className="track-content"
+                  style={{ minWidth: `${zoom * 6}px` }}
+                >
+                  {TIMELINE_CLIPS.video.map((c) => (
                     <div
-                      key={mark.label}
-                      className="flex-1 border-r border-border/50 text-[9px] text-muted-foreground px-1"
+                      key={c.label}
+                      className="track-clip"
+                      style={{
+                        left: `${(c.start / TOTAL_DURATION) * 100}%`,
+                        width: `${((c.end - c.start) / TOTAL_DURATION) * 100}%`,
+                        background: c.color,
+                        opacity: 0.85,
+                      }}
                     >
-                      {mark.label}
+                      {c.label}
+                    </div>
+                  ))}
+                  <div
+                    className="playhead"
+                    style={{ left: `${timelineProgress}%` }}
+                  />
+                </div>
+              </div>
+              {/* Audio */}
+              <div className="timeline-track">
+                <div
+                  className="track-label"
+                  style={{ borderLeft: "3px solid #10b981" }}
+                >
+                  AUDIO
+                </div>
+                <div
+                  className="track-content"
+                  style={{ minWidth: `${zoom * 6}px` }}
+                >
+                  {TIMELINE_CLIPS.audio.map((c) => (
+                    <div
+                      key={c.label}
+                      className="track-clip"
+                      style={{
+                        left: `${(c.start / TOTAL_DURATION) * 100}%`,
+                        width: `${((c.end - c.start) / TOTAL_DURATION) * 100}%`,
+                        background: c.color,
+                        opacity: 0.75,
+                      }}
+                    >
+                      {c.label}
                     </div>
                   ))}
                 </div>
               </div>
-            </div>
-
-            {/* Tracks */}
-            <div className="flex-1 overflow-y-auto overflow-x-auto">
-              {TRACKS.map((track) => (
+              {/* FX */}
+              <div className="timeline-track">
                 <div
-                  key={track.id}
-                  className="flex h-[34px] border-b border-border/40 last:border-0"
+                  className="track-label"
+                  style={{ borderLeft: "3px solid #f59e0b" }}
                 >
-                  {/* Track label */}
-                  <div className="w-[80px] flex-shrink-0 border-r border-border/50 flex items-center px-2 gap-1.5">
+                  FX
+                </div>
+                <div
+                  className="track-content"
+                  style={{ minWidth: `${zoom * 6}px` }}
+                >
+                  {TIMELINE_CLIPS.effects.map((c) => (
                     <div
-                      className={cn(
-                        "w-2 h-2 rounded-full flex-shrink-0",
-                        track.color,
-                      )}
-                    />
-                    <span className="text-[10px] text-muted-foreground truncate">
-                      {track.label}
-                    </span>
-                  </div>
-
-                  {/* Clip lane */}
+                      key={c.label}
+                      className="track-clip"
+                      style={{
+                        left: `${(c.start / TOTAL_DURATION) * 100}%`,
+                        width: `${((c.end - c.start) / TOTAL_DURATION) * 100}%`,
+                        background: c.color,
+                        opacity: 0.8,
+                      }}
+                    >
+                      {c.label}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Captions */}
+              <div className="timeline-track">
+                <div
+                  className="track-label"
+                  style={{ borderLeft: "3px solid #a855f7" }}
+                >
+                  CAPT
+                </div>
+                <div
+                  className="track-content"
+                  style={{ minWidth: `${zoom * 6}px` }}
+                >
                   <div
-                    className="flex-1 relative bg-muted/20"
-                    style={{ width: `${100 * zoom}%` }}
+                    className="track-clip"
+                    style={{
+                      left: "8%",
+                      width: "28%",
+                      background: "#a855f7",
+                      opacity: 0.75,
+                    }}
                   >
-                    {/* Playhead */}
-                    <div
-                      className="playhead"
-                      style={{ left: `${playheadPercent}%` }}
-                    />
-
-                    {MOCK_CLIPS.filter((c) => c.track === track.id).map(
-                      (clip) => (
-                        <button
-                          type="button"
-                          key={clip.id}
-                          className={cn(
-                            "absolute top-[3px] bottom-[3px] rounded flex items-center px-2 text-[10px] font-medium text-white truncate cursor-pointer transition-all border",
-                            clip.color,
-                            selectedClip === clip.id
-                              ? "border-white/60 ring-1 ring-white/40"
-                              : "border-transparent opacity-90 hover:opacity-100",
-                          )}
-                          style={{
-                            left: `${(clip.start / TOTAL_DURATION) * 100}%`,
-                            width: `${((clip.end - clip.start) / TOTAL_DURATION) * 100}%`,
-                          }}
-                          onClick={() =>
-                            setSelectedClip(
-                              clip.id === selectedClip ? null : clip.id,
-                            )
-                          }
-                          data-ocid={`timeline.clip.${clip.id}`}
-                        >
-                          {clip.label}
-                        </button>
-                      ),
-                    )}
+                    Caption 1
+                  </div>
+                  <div
+                    className="track-clip"
+                    style={{
+                      left: "48%",
+                      width: "22%",
+                      background: "#a855f7",
+                      opacity: 0.75,
+                    }}
+                  >
+                    Caption 2
                   </div>
                 </div>
-              ))}
-            </div>
-
-            {/* Add track button */}
-            <div className="h-7 border-t border-border/40 flex items-center px-2 gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-5 text-[10px] text-muted-foreground hover:text-foreground gap-1 px-2"
-                data-ocid="timeline.add_track.button"
-              >
-                <Plus className="w-3 h-3" /> Add Track
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-5 text-[10px] text-muted-foreground hover:text-foreground gap-1 px-2"
-                data-ocid="timeline.split.button"
-              >
-                <Scissors className="w-3 h-3" /> Split
-              </Button>
+              </div>
             </div>
           </div>
-        </main>
+        </div>
 
-        {/* Right Panel */}
-        <aside className="w-[280px] flex-shrink-0 border-l border-border overflow-hidden">
-          <RightPanel />
-        </aside>
+        <RightPanel />
       </div>
     </div>
   );

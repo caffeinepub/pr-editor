@@ -1,137 +1,241 @@
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
-  ArrowLeft,
+  ChevronLeft,
+  Clapperboard,
+  Crop,
   Download,
-  Folder,
-  LogOut,
-  Play,
+  MousePointer2,
+  Redo2,
   Save,
-  Upload,
+  Scissors,
+  Settings,
+  SplitSquareHorizontal,
+  Undo2,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 import type { Project } from "../../backend";
-import { useInternetIdentity } from "../../hooks/useInternetIdentity";
 
 interface Props {
   project: Project;
   onBack: () => void;
+  onSave?: () => void;
+  zoom?: number;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
 }
 
-export default function TopToolbar({ project, onBack }: Props) {
-  const { identity, clear } = useInternetIdentity();
-  const shortId =
-    identity?.getPrincipal().toString().slice(0, 6).toUpperCase() ?? "??";
+function TipBtn({
+  tip,
+  icon: Icon,
+  onClick,
+  label,
+  ocid,
+  className = "",
+}: {
+  tip: string;
+  icon: React.ElementType;
+  onClick?: () => void;
+  label?: string;
+  ocid?: string;
+  className?: string;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`h-8 gap-1 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors ${label ? "px-2" : "w-8 px-0"} ${className}`}
+          onClick={onClick}
+          data-ocid={ocid}
+        >
+          <Icon className="w-3.5 h-3.5" />
+          {label && <span className="text-[11px] font-medium">{label}</span>}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent
+        side="bottom"
+        className="text-xs bg-popover border-border text-foreground"
+      >
+        {tip}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+export default function TopToolbar({
+  project,
+  onBack,
+  onSave,
+  zoom = 100,
+  onZoomIn,
+  onZoomOut,
+}: Props) {
+  const [projectName, setProjectName] = useState(project.name);
+  const [editingName, setEditingName] = useState(false);
 
   return (
-    <header className="h-[52px] bg-card border-b border-border flex items-center px-3 gap-2 flex-shrink-0">
-      {/* Back */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8 text-muted-foreground hover:text-foreground"
-        onClick={onBack}
-        data-ocid="toolbar.back.button"
+    <TooltipProvider delayDuration={400}>
+      <div
+        className="flex items-center gap-1 px-2 h-11 border-b border-border shrink-0"
+        style={{ background: "hsl(240 6% 8%)" }}
+        data-ocid="editor.toolbar.panel"
       >
-        <ArrowLeft className="w-4 h-4" />
-      </Button>
-
-      {/* Logo */}
-      <div className="flex items-center gap-2 mr-3">
-        <div className="w-7 h-7 rounded-lg bg-primary/20 border border-primary/40 flex items-center justify-center flex-shrink-0">
-          <Play className="w-3.5 h-3.5 text-primary fill-primary" />
+        <div className="flex items-center gap-1 min-w-0">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onBack}
+                className="text-muted-foreground hover:text-foreground h-8 w-8 px-0"
+                data-ocid="editor.back.button"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              Back to Dashboard
+            </TooltipContent>
+          </Tooltip>
+          <div className="flex items-center gap-1.5 pl-1">
+            <div className="w-6 h-6 rounded bg-primary/15 border border-primary/30 flex items-center justify-center">
+              <Clapperboard className="w-3.5 h-3.5 text-primary" />
+            </div>
+            <span className="font-display font-bold text-[13px] text-primary tracking-wider uppercase">
+              PR EDITOR
+            </span>
+          </div>
         </div>
-        <span className="font-display text-base font-bold tracking-tight">
-          PR <span className="text-primary">EDITOR</span>
-        </span>
-      </div>
 
-      <div className="h-5 w-px bg-border mx-1" />
+        <Separator orientation="vertical" className="h-5 mx-1.5 bg-border" />
 
-      {/* Project name */}
-      <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/50 border border-border">
-        <Folder className="w-3 h-3 text-muted-foreground" />
-        <span className="text-xs text-foreground max-w-[140px] truncate">
-          {project.name}
-        </span>
-      </div>
+        <div className="flex items-center gap-0.5">
+          <TipBtn
+            tip="Select (V)"
+            icon={MousePointer2}
+            label="Select"
+            ocid="editor.select.button"
+          />
+          <TipBtn
+            tip="Cut (C)"
+            icon={Scissors}
+            label="Cut"
+            onClick={() => toast.info("Cut")}
+            ocid="editor.cut.button"
+          />
+          <TipBtn
+            tip="Trim (T)"
+            icon={Crop}
+            label="Trim"
+            onClick={() => toast.info("Trim")}
+            ocid="editor.trim.button"
+          />
+          <TipBtn
+            tip="Split (S)"
+            icon={SplitSquareHorizontal}
+            label="Split"
+            onClick={() => toast.info("Split")}
+            ocid="editor.split.button"
+          />
+        </div>
 
-      <div className="flex-1" />
+        <Separator orientation="vertical" className="h-5 mx-1.5 bg-border" />
 
-      {/* Actions */}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
-        onClick={() => toast.success("Project saved!")}
-        data-ocid="toolbar.save.button"
-      >
-        <Save className="w-3.5 h-3.5" />
-        Save
-      </Button>
+        <div className="flex items-center gap-0.5">
+          <TipBtn
+            tip="Undo (Ctrl+Z)"
+            icon={Undo2}
+            onClick={() => toast.info("Undo")}
+            ocid="editor.undo.button"
+          />
+          <TipBtn
+            tip="Redo (Ctrl+Shift+Z)"
+            icon={Redo2}
+            onClick={() => toast.info("Redo")}
+            ocid="editor.redo.button"
+          />
+        </div>
 
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
-        onClick={() => toast.info("Upload media to your project")}
-        data-ocid="toolbar.upload.button"
-      >
-        <Upload className="w-3.5 h-3.5" />
-        Upload
-      </Button>
+        <Separator orientation="vertical" className="h-5 mx-1.5 bg-border" />
 
-      <Button
-        size="sm"
-        className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground"
-        onClick={() => toast.success("Export started!")}
-        data-ocid="toolbar.export.button"
-      >
-        <Download className="w-3.5 h-3.5" />
-        Export
-      </Button>
+        <div className="flex items-center gap-0.5">
+          <TipBtn
+            tip="Zoom Out"
+            icon={ZoomOut}
+            onClick={onZoomOut}
+            ocid="editor.zoom_out.button"
+          />
+          <span className="text-[11px] font-mono text-muted-foreground w-10 text-center">
+            {zoom}%
+          </span>
+          <TipBtn
+            tip="Zoom In"
+            icon={ZoomIn}
+            onClick={onZoomIn}
+            ocid="editor.zoom_in.button"
+          />
+        </div>
 
-      <div className="h-5 w-px bg-border mx-1" />
+        <div className="flex-1 flex items-center justify-center px-4">
+          {editingName ? (
+            <input
+              className="text-[13px] font-medium text-foreground bg-secondary border border-primary/50 rounded px-2 py-0.5 outline-none text-center max-w-[200px] w-full"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              onBlur={() => setEditingName(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === "Escape")
+                  setEditingName(false);
+              }}
+              data-ocid="editor.project_name.input"
+            />
+          ) : (
+            <button
+              type="button"
+              className="text-[13px] font-medium text-foreground/80 hover:text-foreground px-2 py-0.5 rounded hover:bg-secondary transition-colors max-w-[200px] truncate"
+              onClick={() => setEditingName(true)}
+              title="Click to rename project"
+              data-ocid="editor.project_name.button"
+            >
+              {projectName}
+            </button>
+          )}
+        </div>
 
-      {/* User avatar */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
+        <div className="flex items-center gap-1">
+          <TipBtn
+            tip="Save Project (Ctrl+S)"
+            icon={Save}
+            onClick={onSave}
+            ocid="editor.save.button"
+            className="hover:text-primary"
+          />
           <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 rounded-full"
-            data-ocid="toolbar.user.button"
+            size="sm"
+            className="h-8 gap-1.5 text-[11px] font-semibold bg-primary hover:bg-primary/85 text-primary-foreground px-3 shadow-glow-sm"
+            onClick={() => toast.success("Exporting project…")}
+            data-ocid="editor.export.button"
           >
-            <Avatar className="h-7 w-7">
-              <AvatarFallback className="bg-primary/20 text-primary text-xs font-bold">
-                {shortId.slice(0, 2)}
-              </AvatarFallback>
-            </Avatar>
+            <Download className="w-3.5 h-3.5" /> Export
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          className="bg-card border-border"
-          data-ocid="toolbar.user.dropdown_menu"
-        >
-          <DropdownMenuItem className="text-xs text-muted-foreground cursor-default">
-            {identity?.getPrincipal().toString().slice(0, 16)}...
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={clear}
-            className="text-destructive focus:text-destructive"
-            data-ocid="toolbar.logout.button"
-          >
-            <LogOut className="w-3.5 h-3.5 mr-2" /> Sign Out
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </header>
+          <TipBtn
+            tip="Settings"
+            icon={Settings}
+            ocid="editor.settings.button"
+          />
+        </div>
+      </div>
+    </TooltipProvider>
   );
 }

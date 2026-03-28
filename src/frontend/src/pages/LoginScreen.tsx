@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Film, Loader2, Mic2, Play, Sparkles, Wand2 } from "lucide-react";
-import { motion } from "motion/react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 const FEATURES = [
@@ -14,91 +13,116 @@ export default function LoginScreen() {
   const { login, isLoggingIn } = useInternetIdentity();
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center relative overflow-hidden">
-      {/* Background glow effects */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-primary/5 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-1/4 left-1/3 w-[400px] h-[400px] rounded-full bg-secondary/5 blur-[100px] pointer-events-none" />
+    <div
+      className="min-h-screen bg-background flex flex-col items-center justify-center relative overflow-hidden"
+      data-ocid="login.page"
+    >
+      <div
+        className="absolute pointer-events-none"
+        style={{
+          top: "20%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: 600,
+          height: 600,
+          borderRadius: "50%",
+          background: "hsl(197 100% 45% / 0.04)",
+          filter: "blur(80px)",
+        }}
+      />
+      <div
+        className="absolute pointer-events-none"
+        style={{
+          bottom: "20%",
+          left: "30%",
+          width: 400,
+          height: 400,
+          borderRadius: "50%",
+          background: "hsl(240 60% 50% / 0.04)",
+          filter: "blur(80px)",
+        }}
+      />
 
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-        className="relative z-10 flex flex-col items-center gap-8 max-w-md w-full px-6"
-      >
-        {/* Logo */}
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-primary/20 border border-primary/40 flex items-center justify-center">
-            <Play className="w-6 h-6 text-primary fill-primary" />
+      <div className="relative z-10 flex flex-col items-center gap-8 max-w-sm w-full px-6">
+        <div className="flex flex-col items-center gap-4">
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center"
+            style={{
+              background: "hsl(197 100% 45% / 0.12)",
+              border: "1px solid hsl(197 100% 45% / 0.3)",
+              boxShadow: "0 0 32px hsl(197 100% 45% / 0.15)",
+            }}
+          >
+            <Play
+              className="text-primary"
+              style={{ width: 32, height: 32, fill: "hsl(197 100% 45%)" }}
+            />
           </div>
-          <div>
-            <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">
-              PR <span className="text-primary">EDITOR</span>
+          <div className="text-center">
+            <h1 className="font-display text-4xl font-bold tracking-widest text-primary uppercase">
+              PR EDITOR
             </h1>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1 tracking-widest uppercase">
               Professional Video Editor
             </p>
           </div>
         </div>
 
-        {/* Tagline */}
         <div className="text-center">
-          <h2 className="font-display text-2xl font-semibold text-foreground mb-2">
+          <h2 className="font-display text-xl font-semibold text-foreground mb-2">
             Create. Edit. Share.
           </h2>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            AI-powered video editing with auto captions, smart cuts, voice
-            synthesis, and stunning effects.
+            AI-powered editing with auto captions, smart cuts, voice synthesis,
+            and stunning effects.
           </p>
         </div>
 
-        {/* Feature pills */}
-        <div className="grid grid-cols-2 gap-3 w-full">
+        <div className="grid grid-cols-2 gap-2.5 w-full">
           {FEATURES.map(({ icon: Icon, label }) => (
             <div
               key={label}
-              className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 py-2"
+              className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 border border-border"
+              style={{ background: "hsl(240 6% 8%)" }}
             >
               <Icon className="w-4 h-4 text-primary flex-shrink-0" />
-              <span className="text-xs text-foreground">{label}</span>
+              <span className="text-xs text-foreground/80">{label}</span>
             </div>
           ))}
         </div>
 
-        {/* Login button */}
         <Button
           size="lg"
-          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-base h-12 rounded-xl shadow-glow"
+          className="w-full bg-primary hover:bg-primary/85 text-primary-foreground font-semibold text-sm h-11 rounded-lg shadow-glow"
           onClick={login}
           disabled={isLoggingIn}
-          data-ocid="login.primary_button"
+          data-ocid="login.submit.button"
         >
           {isLoggingIn ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Connecting...
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Connecting…
             </>
           ) : (
-            "Get Started — Sign In"
+            "Sign In to Continue"
           )}
         </Button>
 
-        <p className="text-xs text-muted-foreground text-center">
-          Powered by Internet Computer · Secure & Decentralized
+        <p className="text-[11px] text-muted-foreground/50 text-center">
+          Secured by Internet Identity
         </p>
-      </motion.div>
+      </div>
 
-      {/* Footer */}
-      <div className="absolute bottom-6 text-xs text-muted-foreground">
-        © {new Date().getFullYear()}. Built with love using{" "}
+      <p className="absolute bottom-4 text-[10px] text-muted-foreground/40">
+        &copy; {new Date().getFullYear()}. Built with &#9829; using{" "}
         <a
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
+          className="hover:text-muted-foreground/60 transition-colors"
           target="_blank"
-          rel="noopener noreferrer"
-          className="text-primary hover:underline"
+          rel="noreferrer"
         >
           caffeine.ai
         </a>
-      </div>
+      </p>
     </div>
   );
 }

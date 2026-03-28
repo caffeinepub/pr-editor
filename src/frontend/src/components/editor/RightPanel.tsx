@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -9,506 +8,308 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
-import {
-  BookOpen,
-  Eye,
-  Film,
-  Image,
-  Loader2,
-  MessageSquare,
-  Mic,
-  Scissors,
-  Subtitles,
-  Type,
-  Volume2,
-  Wand2,
-  Zap,
-} from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Download } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { JobType } from "../../backend";
-import { useCreateAIJob, useGetUserJobs } from "../../hooks/useQueries";
 
-const TOOL_JOB_TYPE: Record<string, JobType> = {
-  autoCut: JobType.autoCut,
-  remover: JobType.remover,
-  show: JobType.autoCut,
-  sync: JobType.autoCut,
-  videoGen: JobType.textToVideo,
-  storyToVideo: JobType.textToVideo,
-  tts: JobType.tts,
-  captions: JobType.captions,
-  imageToVideo: JobType.imageToVideo,
-  textToVideo: JobType.textToVideo,
-};
+type RightTab = "properties" | "color" | "speed" | "export";
 
-const AI_TOOLS = [
-  {
-    id: "autoCut",
-    label: "AI Auto Cut",
-    icon: Scissors,
-    desc: "Smart scene detection & cutting",
-    color: "text-violet-400",
-  },
-  {
-    id: "remover",
-    label: "AI Remover",
-    icon: Wand2,
-    desc: "Remove objects & backgrounds",
-    color: "text-cyan-400",
-  },
-  {
-    id: "show",
-    label: "AI Show",
-    icon: Eye,
-    desc: "Enhance & highlight subjects",
-    color: "text-emerald-400",
-  },
-  {
-    id: "sync",
-    label: "AI Best Sync",
-    icon: Zap,
-    desc: "Auto-sync audio to beats",
-    color: "text-amber-400",
-  },
-];
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return <p className="section-label">{children}</p>;
+}
 
-const GEN_TOOLS = [
-  {
-    id: "textToVideo",
-    label: "Text to Video",
-    icon: Type,
-    placeholder: "Describe your video scene...",
-  },
-  {
-    id: "imageToVideo",
-    label: "Image to Video",
-    icon: Image,
-    placeholder: "Upload an image to animate...",
-  },
-  {
-    id: "videoGen",
-    label: "Video Gen",
-    icon: Film,
-    placeholder: "Enter a video generation prompt...",
-  },
-  {
-    id: "storyToVideo",
-    label: "Story to Video",
-    icon: BookOpen,
-    placeholder: "Enter your story or script...",
-  },
-];
+function SliderRow({
+  label,
+  value,
+  onChange,
+  min = 0,
+  max = 100,
+  step = 1,
+  unit = "",
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+}) {
+  return (
+    <div className="mb-3">
+      <div className="flex justify-between items-center mb-1.5">
+        <span className="prop-label">{label}</span>
+        <span className="prop-value">
+          {value}
+          {unit}
+        </span>
+      </div>
+      <Slider
+        value={[value]}
+        onValueChange={([v]) => onChange(v)}
+        min={min}
+        max={max}
+        step={step}
+        className="w-full"
+      />
+    </div>
+  );
+}
 
 export default function RightPanel() {
-  const [ttsText, setTtsText] = useState("");
-  const [ttsLang, setTtsLang] = useState("en");
-  const [ttsVoice, setTtsVoice] = useState("female");
-  const [captionLang, setCaptionLang] = useState("en");
-  const [genPrompts, setGenPrompts] = useState<Record<string, string>>({});
-  const [editSpeechText, setEditSpeechText] = useState("");
-  const [mockCaptions, setMockCaptions] = useState<
-    { text: string; time: string }[]
-  >([]);
+  const [activeTab, setActiveTab] = useState<RightTab>("properties");
+  const [posX, setPosX] = useState(0);
+  const [posY, setPosY] = useState(0);
+  const [scale, setScale] = useState(100);
+  const [rotation, setRotation] = useState(0);
+  const [opacity, setOpacity] = useState(100);
+  const [brightness, setBrightness] = useState(100);
+  const [contrast, setContrast] = useState(100);
+  const [saturation, setSaturation] = useState(100);
+  const [hue, setHue] = useState(0);
+  const [temperature, setTemperature] = useState(0);
+  const [highlights, setHighlights] = useState(0);
+  const [shadows, setShadows] = useState(0);
+  const [speed, setSpeed] = useState(1.0);
+  const [reversed, setReversed] = useState(false);
+  const [format, setFormat] = useState("mp4");
+  const [resolution, setResolution] = useState("1080p");
+  const [quality, setQuality] = useState(80);
+  const [fps, setFps] = useState("30");
 
-  const createJob = useCreateAIJob();
-  const { data: jobs = [] } = useGetUserJobs();
-
-  const runningJobs = jobs.filter(
-    (j) => j.status === "processing" || j.status === "pending",
-  );
-
-  const handleAITool = async (toolId: string, label: string) => {
-    const jobType = TOOL_JOB_TYPE[toolId];
-    if (!jobType) return;
-    try {
-      await createJob.mutateAsync(jobType);
-      toast.success(`${label} job started!`, {
-        description: "Processing in background...",
-      });
-    } catch {
-      toast.error(`Failed to start ${label}`);
-    }
-  };
-
-  const handleTTS = async () => {
-    if (!ttsText.trim()) return;
-    try {
-      await createJob.mutateAsync(JobType.tts);
-      toast.success("Text-to-Speech generated!", {
-        description: `Voice: ${ttsVoice} · Language: ${ttsLang}`,
-      });
-      setTtsText("");
-    } catch {
-      toast.error("TTS generation failed");
-    }
-  };
-
-  const handleGenerate = async (toolId: string, label: string) => {
-    const prompt = genPrompts[toolId];
-    if (!prompt?.trim()) return;
-    const jobType = TOOL_JOB_TYPE[toolId];
-    if (!jobType) return;
-    try {
-      await createJob.mutateAsync(jobType);
-      toast.success(`${label} started!`, {
-        description: `${prompt.slice(0, 60)}...`,
-      });
-      setGenPrompts((prev) => ({ ...prev, [toolId]: "" }));
-    } catch {
-      toast.error(`Failed to start ${label}`);
-    }
-  };
-
-  const handleGenerateCaptions = async () => {
-    try {
-      await createJob.mutateAsync(JobType.captions);
-      const langLabel =
-        captionLang === "te"
-          ? "Telugu"
-          : captionLang === "hi"
-            ? "Hindi"
-            : "English";
-      setMockCaptions([
-        { text: "Welcome to PR EDITOR", time: "0:00" },
-        {
-          text:
-            langLabel === "Telugu"
-              ? "మీ వీడియో సంపాదించండి"
-              : langLabel === "Hindi"
-                ? "अपना वीडियो संपादित करें"
-                : "Edit your video professionally",
-          time: "0:05",
-        },
-        {
-          text:
-            langLabel === "Telugu"
-              ? "AI తో సులభంగా"
-              : langLabel === "Hindi"
-                ? "AI के साथ आसानी से"
-                : "Powered by AI technology",
-          time: "0:12",
-        },
-      ]);
-      toast.success(`${langLabel} captions generated!`);
-    } catch {
-      toast.error("Failed to generate captions");
-    }
-  };
-
-  const handleAutoSpeech = async () => {
-    try {
-      await createJob.mutateAsync(JobType.autoCut);
-      toast.success("Auto Speech started!", {
-        description: "Processing in background...",
-      });
-    } catch {
-      toast.error("Failed to start Auto Speech");
-    }
-  };
+  const TABS: { id: RightTab; label: string }[] = [
+    { id: "properties", label: "Props" },
+    { id: "color", label: "Color" },
+    { id: "speed", label: "Speed" },
+    { id: "export", label: "Export" },
+  ];
 
   return (
-    <div className="h-full bg-card flex flex-col">
-      <div className="h-10 border-b border-border flex items-center px-3">
-        <span className="text-xs font-semibold text-foreground">AI Tools</span>
-        {runningJobs.length > 0 && (
-          <Badge className="ml-2 h-4 text-[9px] bg-primary/20 text-primary border-primary/30">
-            {runningJobs.length} running
-          </Badge>
-        )}
+    <div className="right-panel" data-ocid="editor.right_panel">
+      <div className="right-panel-tabs">
+        {TABS.map((t) => (
+          <button
+            type="button"
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`right-tab-btn ${activeTab === t.id ? "active" : ""}`}
+            data-ocid={`right_panel.${t.id}.tab`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="p-3 flex flex-col gap-4">
-          {/* AI Tools grid */}
-          <div className="flex flex-col gap-1">
-            {AI_TOOLS.map((tool, idx) => {
-              const Icon = tool.icon;
-              const isRunning = runningJobs.some(
-                (j) => j.jobType === TOOL_JOB_TYPE[tool.id],
-              );
-              return (
-                <button
-                  type="button"
-                  key={tool.id}
-                  disabled={createJob.isPending || isRunning}
-                  onClick={() => handleAITool(tool.id, tool.label)}
-                  className={cn(
-                    "flex items-center gap-3 p-2.5 rounded-lg border transition-all text-left",
-                    "border-border hover:border-primary/40 hover:bg-muted/50",
-                    "disabled:opacity-50 disabled:cursor-not-allowed",
-                  )}
-                  data-ocid={`ai_tools.item.${idx + 1}.button`}
-                >
-                  <div
-                    className={cn(
-                      "w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0",
-                      tool.color,
-                    )}
-                  >
-                    {isRunning ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Icon className="w-4 h-4" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium">{tool.label}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {tool.desc}
-                    </p>
-                  </div>
-                  {isRunning && (
-                    <Badge className="text-[9px] h-4 bg-amber-500/20 text-amber-400 border-amber-500/30">
-                      Running
-                    </Badge>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          <Separator className="bg-border" />
-
-          {/* Speech section */}
-          <div>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              Speech Tools
-            </p>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1 h-8 text-xs gap-1.5 border-border hover:border-primary/40"
-                onClick={() => {
-                  if (!editSpeechText.trim()) {
-                    toast.info("Enter speech text below first");
-                    return;
-                  }
-                  toast.success("Speech edited!");
-                }}
-                data-ocid="speech.edit_speech.button"
-              >
-                <Mic className="w-3.5 h-3.5" /> Edit Speech
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1 h-8 text-xs gap-1.5 border-border hover:border-primary/40"
-                onClick={handleAutoSpeech}
-                disabled={createJob.isPending}
-                data-ocid="speech.auto_speech.button"
-              >
-                <Volume2 className="w-3.5 h-3.5" /> Auto Speech
-              </Button>
+        <div className="right-panel-content">
+          {activeTab === "properties" && (
+            <div>
+              <SectionHeader>Position</SectionHeader>
+              <SliderRow
+                label="X"
+                value={posX}
+                onChange={setPosX}
+                min={-500}
+                max={500}
+              />
+              <SliderRow
+                label="Y"
+                value={posY}
+                onChange={setPosY}
+                min={-500}
+                max={500}
+              />
+              <SectionHeader>Transform</SectionHeader>
+              <SliderRow
+                label="Scale"
+                value={scale}
+                onChange={setScale}
+                min={10}
+                max={300}
+                unit="%"
+              />
+              <SliderRow
+                label="Rotation"
+                value={rotation}
+                onChange={setRotation}
+                min={-180}
+                max={180}
+                unit="\u00B0"
+              />
+              <SectionHeader>Appearance</SectionHeader>
+              <SliderRow
+                label="Opacity"
+                value={opacity}
+                onChange={setOpacity}
+                unit="%"
+              />
             </div>
-            <Textarea
-              placeholder="Enter speech to edit or transcribe..."
-              value={editSpeechText}
-              onChange={(e) => setEditSpeechText(e.target.value)}
-              className="mt-2 h-16 text-xs bg-muted border-border resize-none"
-              data-ocid="speech.edit_speech.textarea"
-            />
-          </div>
+          )}
 
-          <Separator className="bg-border" />
+          {activeTab === "color" && (
+            <div>
+              <SectionHeader>Exposure</SectionHeader>
+              <SliderRow
+                label="Brightness"
+                value={brightness}
+                onChange={setBrightness}
+                min={0}
+                max={200}
+                unit="%"
+              />
+              <SliderRow
+                label="Contrast"
+                value={contrast}
+                onChange={setContrast}
+                min={0}
+                max={200}
+                unit="%"
+              />
+              <SectionHeader>Color</SectionHeader>
+              <SliderRow
+                label="Saturation"
+                value={saturation}
+                onChange={setSaturation}
+                min={0}
+                max={200}
+                unit="%"
+              />
+              <SliderRow
+                label="Hue"
+                value={hue}
+                onChange={setHue}
+                min={-180}
+                max={180}
+                unit="\u00B0"
+              />
+              <SliderRow
+                label="Temp"
+                value={temperature}
+                onChange={setTemperature}
+                min={-100}
+                max={100}
+              />
+              <SectionHeader>Tone</SectionHeader>
+              <SliderRow
+                label="Highlights"
+                value={highlights}
+                onChange={setHighlights}
+                min={-100}
+                max={100}
+              />
+              <SliderRow
+                label="Shadows"
+                value={shadows}
+                onChange={setShadows}
+                min={-100}
+                max={100}
+              />
+            </div>
+          )}
 
-          {/* Text to Speech */}
-          <div>
-            <div className="flex items-center gap-1.5 mb-2">
-              <MessageSquare className="w-3.5 h-3.5 text-primary" />
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Text to Speech
+          {activeTab === "speed" && (
+            <div>
+              <SectionHeader>Playback Speed</SectionHeader>
+              <SliderRow
+                label="Speed"
+                value={Math.round(speed * 100)}
+                onChange={(v) => setSpeed(v / 100)}
+                min={25}
+                max={400}
+                unit="%"
+              />
+              <p className="text-[10px] text-muted-foreground mb-3">
+                Current: {speed.toFixed(2)}x
               </p>
-            </div>
-            <Textarea
-              placeholder="Enter text to convert to speech..."
-              value={ttsText}
-              onChange={(e) => setTtsText(e.target.value)}
-              className="h-16 text-xs bg-muted border-border resize-none mb-2"
-              data-ocid="tts.textarea"
-            />
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <div>
-                <Label className="text-[10px] text-muted-foreground mb-1 block">
-                  Language
-                </Label>
-                <Select value={ttsLang} onValueChange={setTtsLang}>
-                  <SelectTrigger
-                    className="h-7 text-xs bg-muted border-border"
-                    data-ocid="tts.language.select"
+              <SectionHeader>Presets</SectionHeader>
+              <div className="grid grid-cols-5 gap-1 mb-3">
+                {[0.25, 0.5, 1, 1.5, 2].map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className={`tb-btn text-center px-1 ${speed === s ? "active" : ""}`}
+                    onClick={() => setSpeed(s)}
                   >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-border">
-                    <SelectItem value="en" className="text-xs">
-                      English
-                    </SelectItem>
-                    <SelectItem value="hi" className="text-xs">
-                      Hindi
-                    </SelectItem>
-                    <SelectItem value="te" className="text-xs">
-                      Telugu
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                    {s}x
+                  </button>
+                ))}
               </div>
-              <div>
-                <Label className="text-[10px] text-muted-foreground mb-1 block">
-                  Voice
-                </Label>
-                <Select value={ttsVoice} onValueChange={setTtsVoice}>
-                  <SelectTrigger
-                    className="h-7 text-xs bg-muted border-border"
-                    data-ocid="tts.voice.select"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-border">
-                    <SelectItem value="female" className="text-xs">
-                      Female
-                    </SelectItem>
-                    <SelectItem value="male" className="text-xs">
-                      Male
-                    </SelectItem>
-                    <SelectItem value="neutral" className="text-xs">
-                      Neutral
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+              <SectionHeader>Options</SectionHeader>
+              <div className="flex items-center justify-between py-2">
+                <span className="prop-label">Reverse</span>
+                <Switch
+                  checked={reversed}
+                  onCheckedChange={setReversed}
+                  data-ocid="right_panel.reverse.switch"
+                />
               </div>
             </div>
-            <Button
-              size="sm"
-              className="w-full h-8 text-xs bg-primary hover:bg-primary/90"
-              disabled={!ttsText.trim() || createJob.isPending}
-              onClick={handleTTS}
-              data-ocid="tts.generate.button"
-            >
-              {createJob.isPending ? (
-                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-              ) : null}
-              Generate Speech
-            </Button>
-          </div>
+          )}
 
-          <Separator className="bg-border" />
-
-          {/* Captions */}
-          <div>
-            <div className="flex items-center gap-1.5 mb-2">
-              <Subtitles className="w-3.5 h-3.5 text-secondary" />
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Auto Captions
-              </p>
-            </div>
-            <div className="mb-2">
-              <Label className="text-[10px] text-muted-foreground mb-1 block">
-                Language
-              </Label>
-              <Select value={captionLang} onValueChange={setCaptionLang}>
+          {activeTab === "export" && (
+            <div>
+              <SectionHeader>Format</SectionHeader>
+              <Select value={format} onValueChange={setFormat}>
                 <SelectTrigger
-                  className="h-7 text-xs bg-muted border-border"
-                  data-ocid="captions.language.select"
+                  className="h-8 text-xs mb-2"
+                  data-ocid="right_panel.format.select"
                 >
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  <SelectItem value="en" className="text-xs">
-                    🇺🇸 English
-                  </SelectItem>
-                  <SelectItem value="hi" className="text-xs">
-                    🇮🇳 Hindi
-                  </SelectItem>
-                  <SelectItem value="te" className="text-xs">
-                    🏴 Telugu
-                  </SelectItem>
+                <SelectContent>
+                  <SelectItem value="mp4">MP4 — H.264</SelectItem>
+                  <SelectItem value="mov">MOV — ProRes</SelectItem>
+                  <SelectItem value="webm">WebM — VP9</SelectItem>
+                  <SelectItem value="gif">GIF (Animated)</SelectItem>
                 </SelectContent>
               </Select>
+              <SectionHeader>Video Settings</SectionHeader>
+              <Select value={resolution} onValueChange={setResolution}>
+                <SelectTrigger
+                  className="h-8 text-xs mb-2"
+                  data-ocid="right_panel.resolution.select"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="4k">4K — 3840×2160</SelectItem>
+                  <SelectItem value="1080p">1080p — 1920×1080</SelectItem>
+                  <SelectItem value="720p">720p — 1280×720</SelectItem>
+                  <SelectItem value="480p">480p — 854×480</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={fps} onValueChange={setFps}>
+                <SelectTrigger
+                  className="h-8 text-xs mb-2"
+                  data-ocid="right_panel.fps.select"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="24">24 fps — Film</SelectItem>
+                  <SelectItem value="30">30 fps — Standard</SelectItem>
+                  <SelectItem value="60">60 fps — Smooth</SelectItem>
+                  <SelectItem value="120">120 fps — High Speed</SelectItem>
+                </SelectContent>
+              </Select>
+              <SliderRow
+                label="Quality"
+                value={quality}
+                onChange={setQuality}
+                unit="%"
+              />
+              <Button
+                size="sm"
+                className="w-full h-8 text-xs font-semibold mt-2 bg-primary hover:bg-primary/85 text-primary-foreground gap-1.5 shadow-glow-sm"
+                onClick={() => toast.success("Export started!")}
+                data-ocid="right_panel.export.button"
+              >
+                <Download className="w-3.5 h-3.5" /> Export Video
+              </Button>
             </div>
-            <Button
-              size="sm"
-              className="w-full h-8 text-xs bg-secondary/20 hover:bg-secondary/30 text-secondary border border-secondary/30 mb-2"
-              disabled={createJob.isPending}
-              onClick={handleGenerateCaptions}
-              data-ocid="captions.generate.button"
-            >
-              {createJob.isPending ? (
-                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-              ) : null}
-              Generate Captions
-            </Button>
-            {mockCaptions.length > 0 && (
-              <div className="flex flex-col gap-1" data-ocid="captions.list">
-                {mockCaptions.map((cap, idx) => (
-                  <div
-                    key={cap.time + String(idx)}
-                    className="flex items-start gap-2 p-2 rounded-lg bg-muted/40 border border-border"
-                    data-ocid={`captions.item.${idx + 1}`}
-                  >
-                    <span className="text-[9px] text-secondary font-mono mt-0.5 flex-shrink-0">
-                      {cap.time}
-                    </span>
-                    <span className="text-[10px] text-foreground leading-snug">
-                      {cap.text}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <Separator className="bg-border" />
-
-          {/* Generation tools */}
-          <div>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              AI Generation
-            </p>
-            <div className="flex flex-col gap-3">
-              {GEN_TOOLS.map((tool, idx) => {
-                const Icon = tool.icon;
-                return (
-                  <div key={tool.id} data-ocid={`generation.item.${idx + 1}`}>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Icon className="w-3 h-3 text-primary" />
-                      <span className="text-[10px] font-medium text-foreground">
-                        {tool.label}
-                      </span>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <Textarea
-                        placeholder={tool.placeholder}
-                        value={genPrompts[tool.id] ?? ""}
-                        onChange={(e) =>
-                          setGenPrompts((prev) => ({
-                            ...prev,
-                            [tool.id]: e.target.value,
-                          }))
-                        }
-                        className="flex-1 h-14 text-[10px] bg-muted border-border resize-none"
-                        data-ocid={`generation.${tool.id}.textarea`}
-                      />
-                    </div>
-                    <Button
-                      size="sm"
-                      className="w-full h-7 mt-1 text-[10px] bg-muted hover:bg-muted/80 border border-border hover:border-primary/40"
-                      disabled={
-                        !genPrompts[tool.id]?.trim() || createJob.isPending
-                      }
-                      onClick={() => handleGenerate(tool.id, tool.label)}
-                      data-ocid={`generation.${tool.id}.button`}
-                    >
-                      Generate
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          )}
         </div>
       </ScrollArea>
     </div>
