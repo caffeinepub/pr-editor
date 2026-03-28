@@ -442,6 +442,7 @@ export default function App() {
   const [uploadedFiles, setUploadedFiles] = useState<
     { name: string; url: string; type: "video" | "image" | "audio" }[]
   >([]);
+  const [activeFileIndex, setActiveFileIndex] = useState<number>(0);
 
   // playback
   const [isPlaying, setIsPlaying] = useState(false);
@@ -1485,52 +1486,134 @@ export default function App() {
                     </div>
                   </div>
                 ) : (
-                  (() => {
-                    const firstVideo = uploadedFiles.find(
-                      (f) => f.type === "video" && f.url,
-                    );
-                    const firstImage = uploadedFiles.find(
-                      (f) => f.type === "image" && f.url,
-                    );
-                    if (firstVideo) {
-                      return (
-                        <video
-                          src={firstVideo.url}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "contain",
-                            maxHeight: "100%",
-                          }}
-                          controls
-                        >
-                          <track kind="captions" />
-                        </video>
-                      );
-                    }
-                    if (firstImage) {
-                      return (
-                        <img
-                          src={firstImage.url}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "contain",
-                            maxHeight: "100%",
-                          }}
-                          alt="preview"
-                        />
-                      );
-                    }
-                    return (
-                      <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 40, marginBottom: 8 }}>🎵</div>
-                        <div style={{ fontSize: 12, color: "#aaa" }}>
-                          {uploadedFiles[0].name}
-                        </div>
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      display: "flex",
+                      flexDirection: "column",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {/* Active file large preview */}
+                    <div
+                      style={{
+                        flex: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        overflow: "hidden",
+                        background: "#0a0a0a",
+                      }}
+                    >
+                      {(() => {
+                        const activeFile =
+                          uploadedFiles[activeFileIndex] || uploadedFiles[0];
+                        if (!activeFile) return null;
+                        if (activeFile.type === "video") {
+                          return (
+                            <video
+                              key={activeFile.url}
+                              src={activeFile.url}
+                              style={{
+                                maxWidth: "100%",
+                                maxHeight: "100%",
+                                objectFit: "contain",
+                              }}
+                              controls
+                            >
+                              <track kind="captions" />
+                            </video>
+                          );
+                        }
+                        if (activeFile.type === "image") {
+                          return (
+                            <img
+                              key={activeFile.url}
+                              src={activeFile.url}
+                              style={{
+                                maxWidth: "100%",
+                                maxHeight: "100%",
+                                objectFit: "contain",
+                              }}
+                              alt={activeFile.name}
+                            />
+                          );
+                        }
+                        return (
+                          <div style={{ textAlign: "center" }}>
+                            <div style={{ fontSize: 40, marginBottom: 8 }}>
+                              🎵
+                            </div>
+                            <div style={{ fontSize: 12, color: "#aaa" }}>
+                              {activeFile.name}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    {/* Thumbnails strip — show all files */}
+                    {uploadedFiles.length > 1 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 4,
+                          padding: "6px 8px",
+                          background: "#111",
+                          overflowX: "auto",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {uploadedFiles.map((f, idx) => (
+                          <button
+                            key={f.url}
+                            type="button"
+                            onClick={() => setActiveFileIndex(idx)}
+                            style={{
+                              flexShrink: 0,
+                              width: 60,
+                              height: 40,
+                              borderRadius: 4,
+                              overflow: "hidden",
+                              border:
+                                idx === activeFileIndex
+                                  ? "2px solid #00d4ff"
+                                  : "2px solid #333",
+                              cursor: "pointer",
+                              background: "#1a1a1a",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            {f.type === "image" ? (
+                              <img
+                                src={f.url}
+                                alt={f.name}
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                }}
+                              />
+                            ) : f.type === "video" ? (
+                              <video
+                                src={f.url}
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                }}
+                                muted
+                              />
+                            ) : (
+                              <span style={{ fontSize: 18 }}>🎵</span>
+                            )}
+                          </button>
+                        ))}
                       </div>
-                    );
-                  })()
+                    )}
+                  </div>
                 )}
                 {/* Playhead overlay */}
                 <div
