@@ -27,6 +27,13 @@ import { toast } from "sonner";
 import { JobType } from "../../backend";
 import { useCreateAIJob } from "../../hooks/useQueries";
 
+export type UploadedFile = {
+  name: string;
+  type: "video" | "image" | "audio";
+  url: string;
+  size: string;
+};
+
 type TabId =
   | "media"
   | "audio"
@@ -593,9 +600,16 @@ function SearchBar({ placeholder }: { placeholder: string }) {
 interface Props {
   activeTab: TabId;
   onTabChange: (t: TabId) => void;
+  uploadedFiles: UploadedFile[];
+  onFilesAdded: (files: UploadedFile[]) => void;
 }
 
-export default function LeftPanel({ activeTab, onTabChange }: Props) {
+export default function LeftPanel({
+  activeTab,
+  onTabChange,
+  uploadedFiles,
+  onFilesAdded,
+}: Props) {
   const createJob = useCreateAIJob();
   const [audioSub, setAudioSub] = useState("Music");
   const [captionLang, setCaptionLang] = useState<"en" | "te" | "hi">("en");
@@ -609,6 +623,34 @@ export default function LeftPanel({ activeTab, onTabChange }: Props) {
     } catch {
       toast.error("Failed to queue job");
     }
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const newFiles: UploadedFile[] = files.map((file) => {
+      const url = URL.createObjectURL(file);
+      let type: "video" | "image" | "audio" = "video";
+      if (file.type.startsWith("image")) type = "image";
+      else if (file.type.startsWith("audio")) type = "audio";
+
+      let size: string;
+      const mb = file.size / 1024 / 1024;
+      if (mb < 1) {
+        size = `${(file.size / 1024).toFixed(0)} KB`;
+      } else {
+        size = `${mb.toFixed(1)} MB`;
+      }
+
+      return { name: file.name, type, url, size };
+    });
+
+    onFilesAdded(newFiles);
+    toast.success(
+      `${files.length} file${files.length > 1 ? "s" : ""} uploaded successfully`,
+    );
+    e.target.value = "";
   }
 
   return (
@@ -640,22 +682,14 @@ export default function LeftPanel({ activeTab, onTabChange }: Props) {
             <div
               className={`tab-section ${activeTab === "media" ? "visible" : ""}`}
             >
-              <SearchBar placeholder="Search media…" />
+              <SearchBar placeholder="Search media\u2026" />
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="video/*,image/*,audio/*,.mp4,.mov,.avi,.png,.jpg,.jpeg,.gif,.mp3,.wav"
                 multiple
                 style={{ display: "none" }}
-                onChange={(e) => {
-                  const files = Array.from(e.target.files || []);
-                  if (files.length > 0) {
-                    toast.success(
-                      `${files.length} file${files.length > 1 ? "s" : ""} added`,
-                    );
-                  }
-                  e.target.value = "";
-                }}
+                onChange={handleFileChange}
               />
               {/* Upload box */}
               <button
@@ -672,7 +706,7 @@ export default function LeftPanel({ activeTab, onTabChange }: Props) {
                   Upload from device
                 </p>
                 <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                  MP4, MOV, AVI, PNG, JPG
+                  MP4, MOV, AVI, PNG, JPG, MP3
                 </p>
               </button>
               {/* Gallery button */}
@@ -691,39 +725,74 @@ export default function LeftPanel({ activeTab, onTabChange }: Props) {
                   Browse Gallery
                 </p>
                 <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                  Videos · Images · Audio
+                  Videos \u00b7 Images \u00b7 Audio
                 </p>
               </button>
-              <p className="section-label">Recent Files</p>
-              {[
-                "Interview_raw.mp4",
-                "B-roll_park.mp4",
-                "Logo_animation.mov",
-              ].map((f) => (
-                <div key={f} className="audio-item">
-                  <Film
-                    className="text-muted-foreground shrink-0"
-                    style={{ width: 13, height: 13 }}
-                  />
-                  <span className="text-[11px] text-foreground/80 flex-1 truncate">
-                    {f}
-                  </span>
-                  <button
-                    type="button"
-                    className="ctrl-btn text-[9px]"
-                    onClick={() => toast.info(`Added ${f}`)}
-                  >
-                    <Plus style={{ width: 11, height: 11 }} />
-                  </button>
-                </div>
-              ))}
+
+              {/* My Files */}
+              <p className="section-label">My Files</p>
+              {uploadedFiles.length === 0 ? (
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "#475569",
+                    textAlign: "center",
+                    padding: "12px 0",
+                    fontStyle: "italic",
+                  }}
+                >
+                  No files yet \u2014 upload above
+                </p>
+              ) : (
+                uploadedFiles.map((f, idx) => {
+                  const Icon =
+                    f.type === "video"
+                      ? Film
+                      : f.type === "image"
+                        ? ImageIcon
+                        : Music;
+                  return (
+                    <div
+                      key={`${f.name}-${idx}`}
+                      className="audio-item"
+                      data-ocid={`editor.media.item.${idx + 1}`}
+                    >
+                      <Icon
+                        className="text-muted-foreground shrink-0"
+                        style={{ width: 13, height: 13 }}
+                      />
+                      <span className="text-[11px] text-foreground/80 flex-1 truncate">
+                        {f.name}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 9,
+                          color: "#64748b",
+                          flexShrink: 0,
+                          marginRight: 4,
+                        }}
+                      >
+                        {f.size}
+                      </span>
+                      <button
+                        type="button"
+                        className="ctrl-btn text-[9px]"
+                        onClick={() => toast.info(`Added ${f.name}`)}
+                        data-ocid={`editor.media.add.${idx + 1}`}
+                      >
+                        <Plus style={{ width: 11, height: 11 }} />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             {/* AUDIO */}
             <div
               className={`tab-section ${activeTab === "audio" ? "visible" : ""}`}
             >
-              <SearchBar placeholder="Search audio…" />
+              <SearchBar placeholder="Search audio\u2026" />
               <div className="sub-tabs">
                 {Object.keys(AUDIO_TRACKS).map((k) => (
                   <button
@@ -775,7 +844,7 @@ export default function LeftPanel({ activeTab, onTabChange }: Props) {
             <div
               className={`tab-section ${activeTab === "effects" ? "visible" : ""}`}
             >
-              <SearchBar placeholder="Search effects…" />
+              <SearchBar placeholder="Search effects\u2026" />
               <div className="grid-2">
                 {EFFECTS.map((e) => (
                   <button
@@ -798,7 +867,7 @@ export default function LeftPanel({ activeTab, onTabChange }: Props) {
             <div
               className={`tab-section ${activeTab === "filters" ? "visible" : ""}`}
             >
-              <SearchBar placeholder="Search filters…" />
+              <SearchBar placeholder="Search filters\u2026" />
               <div className="grid-2">
                 {FILTERS.map((f) => (
                   <button
@@ -821,7 +890,7 @@ export default function LeftPanel({ activeTab, onTabChange }: Props) {
             <div
               className={`tab-section ${activeTab === "stickers" ? "visible" : ""}`}
             >
-              <SearchBar placeholder="Search stickers…" />
+              <SearchBar placeholder="Search stickers\u2026" />
               <div className="grid grid-cols-4 gap-1.5">
                 {STICKERS.map((s) => (
                   <button
@@ -873,7 +942,7 @@ export default function LeftPanel({ activeTab, onTabChange }: Props) {
             <div
               className={`tab-section ${activeTab === "transitions" ? "visible" : ""}`}
             >
-              <SearchBar placeholder="Search transitions…" />
+              <SearchBar placeholder="Search transitions\u2026" />
               <div className="grid-2">
                 {TRANSITIONS.map((t) => (
                   <button
@@ -955,7 +1024,7 @@ export default function LeftPanel({ activeTab, onTabChange }: Props) {
             <div
               className={`tab-section ${activeTab === "templates" ? "visible" : ""}`}
             >
-              <SearchBar placeholder="Search templates…" />
+              <SearchBar placeholder="Search templates\u2026" />
               {TEMPLATES.map((t) => (
                 <button
                   type="button"
@@ -975,16 +1044,16 @@ export default function LeftPanel({ activeTab, onTabChange }: Props) {
             >
               <p className="section-label">Voice Settings</p>
               <select className="select-native">
-                <option>Male — Deep</option>
-                <option>Female — Warm</option>
-                <option>Male — Neutral</option>
-                <option>Female — Crisp</option>
+                <option>Male \u2014 Deep</option>
+                <option>Female \u2014 Warm</option>
+                <option>Male \u2014 Neutral</option>
+                <option>Female \u2014 Crisp</option>
               </select>
               <p className="section-label">Script</p>
               <textarea
                 className="text-input"
                 rows={4}
-                placeholder="Type your script here…"
+                placeholder="Type your script here\u2026"
                 data-ocid="editor.voiceover.textarea"
               />
               <button

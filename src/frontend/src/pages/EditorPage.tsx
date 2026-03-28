@@ -1,6 +1,9 @@
 import {
   FastForward,
+  Film,
+  ImageIcon,
   Maximize,
+  Music,
   Pause,
   Play,
   Rewind,
@@ -11,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Project } from "../backend";
 import LeftPanel from "../components/editor/LeftPanel";
+import type { UploadedFile } from "../components/editor/LeftPanel";
 import RightPanel from "../components/editor/RightPanel";
 import TopToolbar from "../components/editor/TopToolbar";
 
@@ -34,7 +38,7 @@ type LeftTab =
 
 const TOTAL_DURATION = 60;
 
-const TIMELINE_CLIPS = {
+const STATIC_TIMELINE_CLIPS = {
   video: [
     { start: 0, end: 15, label: "Clip 1", color: "#0ea5e9" },
     { start: 18, end: 35, label: "Clip 2", color: "#38bdf8" },
@@ -52,6 +56,7 @@ export default function EditorPage({ project, onBack }: Props) {
   const [currentTime, setCurrentTime] = useState(0);
   const [zoom, setZoom] = useState(100);
   const [leftTab, setLeftTab] = useState<LeftTab>("media");
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const rafRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
 
@@ -112,6 +117,23 @@ export default function EditorPage({ project, onBack }: Props) {
   const timelineProgress = (currentTime / TOTAL_DURATION) * 100;
   const frame = Math.floor((currentTime % 1) * 30);
 
+  // Dynamic video timeline clips from uploaded files
+  const mediaFiles = uploadedFiles.filter(
+    (f) => f.type === "video" || f.type === "image",
+  );
+  const videoClips =
+    mediaFiles.length > 0
+      ? mediaFiles.map((f, i) => {
+          const dur = TOTAL_DURATION / mediaFiles.length;
+          return {
+            start: i * dur,
+            end: (i + 1) * dur,
+            label: f.name.length > 14 ? `${f.name.slice(0, 12)}…` : f.name,
+            color: i % 2 === 0 ? "#0ea5e9" : "#38bdf8",
+          };
+        })
+      : STATIC_TIMELINE_CLIPS.video;
+
   return (
     <div className="editor-root" data-ocid="editor.page">
       <TopToolbar
@@ -124,54 +146,157 @@ export default function EditorPage({ project, onBack }: Props) {
       />
 
       <div className="editor-body">
-        <LeftPanel activeTab={leftTab} onTabChange={setLeftTab} />
+        <LeftPanel
+          activeTab={leftTab}
+          onTabChange={setLeftTab}
+          uploadedFiles={uploadedFiles}
+          onFilesAdded={(files) =>
+            setUploadedFiles((prev) => [...prev, ...files])
+          }
+        />
 
         <div className="center-area">
           {/* Preview */}
           <div className="preview-area">
             <div className="preview-canvas">
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background:
-                    "repeating-linear-gradient(0deg, transparent, transparent 39px, hsl(240 5% 10%) 39px, hsl(240 5% 10%) 40px), repeating-linear-gradient(90deg, transparent, transparent 69px, hsl(240 5% 10%) 69px, hsl(240 5% 10%) 70px)",
-                  opacity: 0.4,
-                }}
-              />
-              <div className="flex flex-col items-center gap-3 relative z-10">
-                <div
-                  style={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: 16,
-                    background: "hsl(197 100% 45% / 0.12)",
-                    border: "1px solid hsl(197 100% 45% / 0.25)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Play
+              {uploadedFiles.length === 0 ? (
+                <>
+                  <div
                     style={{
-                      width: 28,
-                      height: 28,
-                      color: "hsl(197 100% 45%)",
-                      opacity: 0.8,
-                      fill: "hsl(197 100% 45%)",
+                      position: "absolute",
+                      inset: 0,
+                      background:
+                        "repeating-linear-gradient(0deg, transparent, transparent 39px, hsl(240 5% 10%) 39px, hsl(240 5% 10%) 40px), repeating-linear-gradient(90deg, transparent, transparent 69px, hsl(240 5% 10%) 69px, hsl(240 5% 10%) 70px)",
+                      opacity: 0.4,
                     }}
                   />
-                </div>
-                <p
+                  <div className="flex flex-col items-center gap-3 relative z-10">
+                    <div
+                      style={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: 16,
+                        background: "hsl(197 100% 45% / 0.12)",
+                        border: "1px solid hsl(197 100% 45% / 0.25)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Play
+                        style={{
+                          width: 28,
+                          height: 28,
+                          color: "hsl(197 100% 45%)",
+                          opacity: 0.8,
+                          fill: "hsl(197 100% 45%)",
+                        }}
+                      />
+                    </div>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "hsl(240 5% 46%)",
+                        fontWeight: 500,
+                      }}
+                    >
+                      Drop media to start editing
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div
                   style={{
-                    fontSize: 13,
-                    color: "hsl(240 5% 46%)",
-                    fontWeight: 500,
+                    position: "absolute",
+                    inset: 0,
+                    overflowY: "auto",
+                    padding: 8,
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fill, minmax(100px, 1fr))",
+                    gap: 6,
+                    alignContent: "start",
                   }}
                 >
-                  {project.name}
-                </p>
-              </div>
+                  {uploadedFiles.map((f, idx) => (
+                    <div
+                      key={`${f.name}-${idx}`}
+                      style={{
+                        borderRadius: 6,
+                        overflow: "hidden",
+                        background: "#161b27",
+                        border: "1px solid #1e2535",
+                        display: "flex",
+                        flexDirection: "column",
+                      }}
+                    >
+                      {f.type === "image" ? (
+                        <img
+                          src={f.url}
+                          alt={f.name}
+                          style={{
+                            width: "100%",
+                            height: 64,
+                            objectFit: "cover",
+                            display: "block",
+                          }}
+                        />
+                      ) : f.type === "video" ? (
+                        <div
+                          style={{
+                            width: "100%",
+                            height: 64,
+                            background: "#0c1120",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Film
+                            style={{
+                              width: 24,
+                              height: 24,
+                              color: "#0ea5e9",
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            width: "100%",
+                            height: 64,
+                            background: "#0c1120",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Music
+                            style={{
+                              width: 24,
+                              height: 24,
+                              color: "#10b981",
+                            }}
+                          />
+                        </div>
+                      )}
+                      <p
+                        style={{
+                          fontSize: 9,
+                          color: "#94a3b8",
+                          padding: "3px 4px",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          margin: 0,
+                        }}
+                      >
+                        {f.name}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div
                 style={{
                   position: "absolute",
@@ -181,6 +306,7 @@ export default function EditorPage({ project, onBack }: Props) {
                   color: "hsl(240 5% 40%)",
                   fontFamily: "JetBrains Mono, monospace",
                   letterSpacing: "0.04em",
+                  zIndex: 20,
                 }}
               >
                 F{String(frame).padStart(2, "0")}
@@ -194,6 +320,7 @@ export default function EditorPage({ project, onBack }: Props) {
                     display: "flex",
                     alignItems: "center",
                     gap: 4,
+                    zIndex: 20,
                   }}
                 >
                   <div
@@ -320,7 +447,7 @@ export default function EditorPage({ project, onBack }: Props) {
                   className="track-content"
                   style={{ minWidth: `${zoom * 6}px` }}
                 >
-                  {TIMELINE_CLIPS.video.map((c) => (
+                  {videoClips.map((c) => (
                     <div
                       key={c.label}
                       className="track-clip"
@@ -352,7 +479,7 @@ export default function EditorPage({ project, onBack }: Props) {
                   className="track-content"
                   style={{ minWidth: `${zoom * 6}px` }}
                 >
-                  {TIMELINE_CLIPS.audio.map((c) => (
+                  {STATIC_TIMELINE_CLIPS.audio.map((c) => (
                     <div
                       key={c.label}
                       className="track-clip"
@@ -380,7 +507,7 @@ export default function EditorPage({ project, onBack }: Props) {
                   className="track-content"
                   style={{ minWidth: `${zoom * 6}px` }}
                 >
-                  {TIMELINE_CLIPS.effects.map((c) => (
+                  {STATIC_TIMELINE_CLIPS.effects.map((c) => (
                     <div
                       key={c.label}
                       className="track-clip"

@@ -439,6 +439,9 @@ export default function App() {
     "videos",
   );
   const [selectedMedia, setSelectedMedia] = useState<string[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<
+    { name: string; url: string; type: "video" | "image" | "audio" }[]
+  >([]);
 
   // playback
   const [isPlaying, setIsPlaying] = useState(false);
@@ -768,6 +771,20 @@ export default function App() {
                       inp.onchange = () => {
                         const files = Array.from(inp.files || []);
                         if (files.length) {
+                          const newFiles = files.map((f) => {
+                            const url = URL.createObjectURL(f);
+                            const type = f.type.startsWith("video")
+                              ? "video"
+                              : f.type.startsWith("audio")
+                                ? "audio"
+                                : "image";
+                            return { name: f.name, url, type } as {
+                              name: string;
+                              url: string;
+                              type: "video" | "image" | "audio";
+                            };
+                          });
+                          setUploadedFiles((prev) => [...prev, ...newFiles]);
                           setSelectedMedia((prev) => [
                             ...prev,
                             ...files.map((f) => f.name),
@@ -1460,12 +1477,61 @@ export default function App() {
                 style={{ filter: filterStyle }}
                 data-ocid="editor.canvas_target"
               >
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 40, marginBottom: 8 }}>🎬</div>
-                  <div style={{ fontSize: 12, color: "#444" }}>
-                    {project ? project.name : "Drop media to start editing"}
+                {uploadedFiles.length === 0 ? (
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 40, marginBottom: 8 }}>🎬</div>
+                    <div style={{ fontSize: 12, color: "#444" }}>
+                      Drop media to start editing
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  (() => {
+                    const firstVideo = uploadedFiles.find(
+                      (f) => f.type === "video" && f.url,
+                    );
+                    const firstImage = uploadedFiles.find(
+                      (f) => f.type === "image" && f.url,
+                    );
+                    if (firstVideo) {
+                      return (
+                        <video
+                          src={firstVideo.url}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "contain",
+                            maxHeight: "100%",
+                          }}
+                          controls
+                        >
+                          <track kind="captions" />
+                        </video>
+                      );
+                    }
+                    if (firstImage) {
+                      return (
+                        <img
+                          src={firstImage.url}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "contain",
+                            maxHeight: "100%",
+                          }}
+                          alt="preview"
+                        />
+                      );
+                    }
+                    return (
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 40, marginBottom: 8 }}>🎵</div>
+                        <div style={{ fontSize: 12, color: "#aaa" }}>
+                          {uploadedFiles[0].name}
+                        </div>
+                      </div>
+                    );
+                  })()
+                )}
                 {/* Playhead overlay */}
                 <div
                   style={{
@@ -1554,36 +1620,78 @@ export default function App() {
                   }}
                 />
 
-                {[
-                  {
-                    label: "Video 1",
-                    color: "#1e4a7a",
-                    clips: [
-                      { left: 0, width: 180, name: "Intro.mp4" },
-                      { left: 200, width: 240, name: "Main.mp4" },
-                    ],
-                  },
-                  {
-                    label: "Audio 1",
-                    color: "#1a5c2a",
-                    clips: [{ left: 0, width: 420, name: "Background.mp3" }],
-                  },
-                  {
-                    label: "Audio 2",
-                    color: "#4a2a5c",
-                    clips: [{ left: 100, width: 120, name: "SFX.mp3" }],
-                  },
-                  {
-                    label: "Captions",
-                    color: "#5c3a1a",
-                    clips: [{ left: 30, width: 200, name: "En Subtitles" }],
-                  },
-                  {
-                    label: "Effects",
-                    color: "#3a1a1a",
-                    clips: [{ left: 80, width: 100, name: "Glitch" }],
-                  },
-                ].map((track, ti) => (
+                {(uploadedFiles.length > 0
+                  ? (() => {
+                      const videoClips = uploadedFiles.filter(
+                        (f) => f.type === "video" || f.type === "image",
+                      );
+                      const audioClips = uploadedFiles.filter(
+                        (f) => f.type === "audio",
+                      );
+                      const tracks: {
+                        label: string;
+                        color: string;
+                        clips: { left: number; width: number; name: string }[];
+                      }[] = [];
+                      if (videoClips.length > 0) {
+                        let left = 0;
+                        tracks.push({
+                          label: "Video 1",
+                          color: "#1e4a7a",
+                          clips: videoClips.map((f) => {
+                            const clip = { left, width: 160, name: f.name };
+                            left += 170;
+                            return clip;
+                          }),
+                        });
+                      }
+                      if (audioClips.length > 0) {
+                        let left = 0;
+                        tracks.push({
+                          label: "Audio 1",
+                          color: "#1a5c2a",
+                          clips: audioClips.map((f) => {
+                            const clip = { left, width: 200, name: f.name };
+                            left += 210;
+                            return clip;
+                          }),
+                        });
+                      }
+                      return tracks;
+                    })()
+                  : [
+                      {
+                        label: "Video 1",
+                        color: "#1e4a7a",
+                        clips: [
+                          { left: 0, width: 180, name: "Intro.mp4" },
+                          { left: 200, width: 240, name: "Main.mp4" },
+                        ],
+                      },
+                      {
+                        label: "Audio 1",
+                        color: "#1a5c2a",
+                        clips: [
+                          { left: 0, width: 420, name: "Background.mp3" },
+                        ],
+                      },
+                      {
+                        label: "Audio 2",
+                        color: "#4a2a5c",
+                        clips: [{ left: 100, width: 120, name: "SFX.mp3" }],
+                      },
+                      {
+                        label: "Captions",
+                        color: "#5c3a1a",
+                        clips: [{ left: 30, width: 200, name: "En Subtitles" }],
+                      },
+                      {
+                        label: "Effects",
+                        color: "#3a1a1a",
+                        clips: [{ left: 80, width: 100, name: "Glitch" }],
+                      },
+                    ]
+                ).map((track, ti) => (
                   <div
                     key={track.label}
                     className="timeline-track"
@@ -2098,6 +2206,14 @@ export default function App() {
                       type="button"
                       key={item.name}
                       onClick={() => {
+                        setUploadedFiles((prev) => [
+                          ...prev,
+                          {
+                            name: `${item.name}.mp4`,
+                            url: "",
+                            type: "video" as const,
+                          },
+                        ]);
                         setSelectedMedia((prev) => [
                           ...prev,
                           `${item.name}.mp4`,
@@ -2148,6 +2264,14 @@ export default function App() {
                       type="button"
                       key={item.name}
                       onClick={() => {
+                        setUploadedFiles((prev) => [
+                          ...prev,
+                          {
+                            name: `${item.name}.png`,
+                            url: "",
+                            type: "image" as const,
+                          },
+                        ]);
                         setSelectedMedia((prev) => [
                           ...prev,
                           `${item.name}.png`,
@@ -2193,6 +2317,14 @@ export default function App() {
                       type="button"
                       key={item.name}
                       onClick={() => {
+                        setUploadedFiles((prev) => [
+                          ...prev,
+                          {
+                            name: `${item.name}.mp3`,
+                            url: "",
+                            type: "audio" as const,
+                          },
+                        ]);
                         setSelectedMedia((prev) => [
                           ...prev,
                           `${item.name}.mp3`,
